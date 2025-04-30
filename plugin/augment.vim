@@ -8,10 +8,46 @@ if exists('g:loaded_augment')
 endif
 let g:loaded_augment = 1
 
-" This flag can be set to enable Lua implementation in the future
-" It currently has no effect - we're preparing the groundwork
+" Flag to enable Lua-based features
 if !exists('g:augment_use_lua')
     let g:augment_use_lua = v:false
+endif
+
+" Flag to enable specific Lua features
+if !exists('g:augment_use_lua_suggestions')
+    let g:augment_use_lua_suggestions = v:false
+endif
+
+" Flag to enable Lua-based chat
+if !exists('g:augment_use_lua_chat')
+    let g:augment_use_lua_chat = v:false
+endif
+
+" Try to use the Lua implementation if enabled
+if has('nvim') && (g:augment_use_lua || g:augment_use_lua_suggestions || g:augment_use_lua_chat)
+    " Initialize Lua implementation with appropriate feature flags
+    lua << EOF
+    -- Try to initialize the Lua implementation
+    local ok, augment = pcall(require, "augment")
+    if ok then
+        -- Set up with appropriate feature flags
+        augment.setup({
+            features = {
+                suggestion = vim.g.augment_use_lua_suggestions or vim.g.augment_use_lua,
+                chat = vim.g.augment_use_lua_chat or vim.g.augment_use_lua,
+                lsp = false    -- Not implemented yet
+            },
+            workspace_folders = vim.g.augment_workspace_folders or {},
+            disable_tab_mapping = vim.g.augment_disable_tab_mapping or false,
+            disable_completions = vim.g.augment_disable_completions or false
+        })
+        
+        -- Log initialization
+        pcall(function()
+            require('augment_log').info("Augment Lua initialized from plugin/augment.vim")
+        end)
+    end
+EOF
 endif
 
 function! s:CheckEditorCompatibility() abort

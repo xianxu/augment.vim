@@ -180,6 +180,30 @@ overridden depending on the order in which the plugins are loaded. If tab isn't
 working for you, the `imap <tab>` command can be used to check if the mapping is
 present.
 
+## Neovim-Specific Enhancements
+
+For Neovim users, this plugin offers enhanced functionality using Lua. These features
+can be enabled individually:
+
+```vim
+" Enable all Lua enhancements
+let g:augment_use_lua = v:true
+
+" Or enable specific features
+let g:augment_use_lua_suggestions = v:true  " Use improved suggestion UI
+let g:augment_use_lua_chat = v:true         " Use enhanced chat interface
+```
+
+The Lua implementation provides:
+
+1. **Improved Suggestions**: Uses Neovim's extmarks for cleaner inline suggestions
+2. **Enhanced Chat Interface**: Better markdown rendering, syntax highlighting for code blocks
+3. **Enhanced Logging**: Detailed logs in `~/.local/state/nvim/augment.log`
+4. **Diagnostic Tools**: Use `:AugmentShowLuaLog` to view detailed logs
+
+These features require Neovim 0.10.0+ and are fully optional - the plugin works
+perfectly with the VimScript implementation as well.
+
 ## FAQ
 
 **Q: I'm not seeing any completions. Is the plugin working?**

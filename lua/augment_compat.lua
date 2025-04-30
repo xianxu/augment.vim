@@ -1,7 +1,7 @@
 -- Copyright (c) 2025 Augment
 -- MIT License - See LICENSE.md for full terms
 
--- This is a simplified compatibility module with minimal dependencies
+-- This is a compatibility module that bridges between VimScript and the Lua implementation
 
 -- Use our dedicated logger or fall back to simple logging if it fails
 local log
@@ -35,6 +35,21 @@ end
 
 -- Create our module
 local M = {}
+
+-- Custom notification handlers table
+local notification_handlers = {}
+
+-- Register a custom handler for notifications
+function M.register_handler(method, handler)
+  if type(handler) ~= "function" then
+    log_error("Handler must be a function")
+    return false
+  end
+  
+  notification_handlers[method] = handler
+  log_info("Registered handler for " .. method)
+  return true
+end
 
 -- Log that we're being loaded
 log_info("augment_compat module loaded", true)
@@ -90,12 +105,27 @@ function M.start_client(command, notification_methods, workspace_folders)
         log.debug("Received notification: " .. method)
       end
       
-      vim.schedule(function()
-        local ok, err = pcall(vim.fn['augment#client#NvimNotification'], method, params)
-        if not ok and log then
-          log.error("Error in notification handler: " .. err)
-        end
-      end)
+      -- Check if we have a custom Lua handler for this method
+      local custom_handler = notification_handlers[method]
+      if custom_handler then
+        -- Use our Lua handler
+        vim.schedule(function()
+          local ok, err = pcall(custom_handler, params)
+          if not ok then
+            log_error("Error in custom handler for " .. method .. ": " .. err)
+            -- Fall back to VimScript handler
+            pcall(vim.fn['augment#client#NvimNotification'], method, params)
+          end
+        end)
+      else
+        -- Use VimScript handler
+        vim.schedule(function()
+          local ok, err = pcall(vim.fn['augment#client#NvimNotification'], method, params)
+          if not ok and log then
+            log.error("Error in notification handler: " .. err)
+          end
+        end)
+      end
     end
   end
   

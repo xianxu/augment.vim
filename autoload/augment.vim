@@ -175,6 +175,63 @@ function! s:CommandChat(range, args) abort
         return
     endif
 
+    " Check if we should use Lua-based chat
+    if has('nvim') && (exists('g:augment_use_lua_chat') && g:augment_use_lua_chat || 
+                      \ exists('g:augment_use_lua') && g:augment_use_lua)
+        " Try to use Lua implementation
+        try
+            " If range arguments were provided (when using :Augment chat) or in visual
+            " mode, get the selected text
+            if a:range == 2 || mode() ==# 'v' || mode() ==# 'V'
+                lua << EOF
+                local chat = require('augment/chat')
+                if chat then
+                    local selected_text = chat.get_selected_text()
+                    -- Get message
+                    local message = vim.fn.empty(vim.fn.eval('a:args')) == 1 
+                        and vim.fn.input('Message: ') 
+                        or vim.fn.eval('a:args')
+                    
+                    -- Handle cancellation
+                    if message == '' or message:match('^%s*$') then
+                        vim.cmd('redraw')
+                        vim.api.nvim_echo({{'Chat cancelled', 'Normal'}}, false, {})
+                        return
+                    end
+                    
+                    -- Send message with selected text
+                    chat.send_message(message, selected_text)
+                end
+EOF
+            else
+                lua << EOF
+                local chat = require('augment/chat')
+                if chat then
+                    -- Get message
+                    local message = vim.fn.empty(vim.fn.eval('a:args')) == 1 
+                        and vim.fn.input('Message: ') 
+                        or vim.fn.eval('a:args')
+                    
+                    -- Handle cancellation
+                    if message == '' or message:match('^%s*$') then
+                        vim.cmd('redraw')
+                        vim.api.nvim_echo({{'Chat cancelled', 'Normal'}}, false, {})
+                        return
+                    end
+                    
+                    -- Send message without selected text
+                    chat.send_message(message)
+                end
+EOF
+            endif
+            return
+        catch
+            " Error with Lua implementation, log and fall back to VimScript
+            call augment#log#Error('Error in Lua chat: ' . v:exception)
+        endtry
+    endif
+
+    " Fall back to VimScript implementation
     " If range arguments were provided (when using :Augment chat) or in visual
     " mode, get the selected text
     if a:range == 2 || mode() ==# 'v' || mode() ==# 'V'
@@ -230,11 +287,21 @@ function! s:CommandChat(range, args) abort
 endfunction
 
 function! s:CommandChatNew(range, args) abort
-    call augment#chat#Reset()
+    " Check if we should use Lua-based chat
+    if augment#chat_lua#IsAvailable()
+        call augment#chat_lua#Reset()
+    else
+        call augment#chat#Reset()
+    endif
 endfunction
 
 function! s:CommandChatToggle(range, args) abort
-    call augment#chat#Toggle()
+    " Check if we should use Lua-based chat
+    if augment#chat_lua#IsAvailable()
+        call augment#chat_lua#Toggle()
+    else
+        call augment#chat#Toggle()
+    endif
 endfunction
 
 " Handle user commands
@@ -245,9 +312,9 @@ let s:command_handlers = {
     \ 'enable': function('s:CommandEnable'),
     \ 'disable': function('s:CommandDisable'),
     \ 'status': function('s:CommandStatus'),
-    \ 'chat': function('s:CommandChat'),
-    \ 'chat-new': function('s:CommandChatNew'),
-    \ 'chat-toggle': function('s:CommandChatToggle'),
+    \ 'chat': function('augment#chat_commands#Chat'),
+    \ 'chat-new': function('augment#chat_commands#ChatNew'),
+    \ 'chat-toggle': function('augment#chat_commands#ChatToggle'),
     \ }
 
 function! augment#Command(range, args) abort range
@@ -323,7 +390,26 @@ endfunction
 function! augment#Accept(...) abort
     " If no fallback was provided, don't add any text
     let fallback = a:0 >= 1 ? a:1 : ''
-
+    
+    " Check if we should use Lua-based suggestions
+    if has('nvim') && (exists('g:augment_use_lua_suggestions') && g:augment_use_lua_suggestions || 
+                      \ exists('g:augment_use_lua') && g:augment_use_lua)
+        " Try to use Lua implementation first
+        let lua_result = v:false
+        try
+            let lua_result = luaeval('_G.augment_accept(_A)', fallback)
+        catch
+            " Error with Lua implementation, fall back to VimScript
+            call augment#log#Error('Error in Lua suggestion acceptance: ' . v:exception)
+        endtry
+        
+        if lua_result
+            " Lua implementation succeeded
+            return
+        endif
+    endif
+    
+    " Fall back to VimScript implementation
     if !augment#suggestion#Accept()
         call feedkeys(fallback, 'nt')
     endif
