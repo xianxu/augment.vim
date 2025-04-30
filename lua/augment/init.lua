@@ -15,7 +15,8 @@ M.config = {
   features = {
     suggestion = true,  -- Use Lua-based suggestions
     chat = true,        -- Use Lua-based chat
-    lsp = true          -- Use pure Lua LSP client
+    lsp = true,         -- Use pure Lua LSP client
+    diagnostics = true  -- Show diagnostics in the editor
   },
   
   -- Optional workspace folders
@@ -37,6 +38,16 @@ M.config = {
     autostart = true,    -- Start the LSP client automatically
     cmd = nil,           -- Use default command
     root_dir = nil       -- Use current working directory
+  },
+  
+  -- Diagnostics configuration
+  diagnostics = {
+    enabled = true,       -- Enable diagnostics
+    signs = true,         -- Show signs in the sign column
+    virtual_text = true,  -- Show virtual text
+    underline = true,     -- Underline diagnostics
+    update_in_insert = false, -- Don't update in insert mode
+    severity_sort = true  -- Sort by severity
   }
 }
 
@@ -118,6 +129,27 @@ function M.setup(opts)
           lsp.register_response_handler('augment/chat', function(result)
             chat.handle_chat_response(result)
           end)
+        end
+      end
+      
+      if M.config.features.diagnostics then
+        local diagnostics_ok, diagnostics = pcall(require, 'augment/diagnostics')
+        if diagnostics_ok then
+          -- Configure diagnostics
+          if opts and opts.diagnostics then
+            diagnostics.setup(opts.diagnostics)
+          else
+            diagnostics.setup(M.config.diagnostics)
+          end
+          
+          -- Register diagnostics handler
+          lsp.register_notification_handler('textDocument/publishDiagnostics', function(params)
+            diagnostics.handle_diagnostics(params)
+          end)
+          
+          log.info("Diagnostics handlers registered")
+        else
+          log.error("Failed to load diagnostics module: " .. tostring(diagnostics))
         end
       end
       

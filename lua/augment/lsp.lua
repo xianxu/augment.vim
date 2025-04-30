@@ -170,6 +170,16 @@ local function setup_handlers()
     logger("LSP: " .. params.message)
   end
   
+  -- Handle diagnostics
+  handlers['textDocument/publishDiagnostics'] = function(_, params, _)
+    local ok, diagnostics = pcall(require, 'augment/diagnostics')
+    if ok then
+      diagnostics.handle_diagnostics(params)
+    else
+      log.error("Failed to load diagnostics module: " .. tostring(diagnostics))
+    end
+  end
+  
   -- Add custom handlers for Augment-specific methods
   for method, handler in pairs(notification_handlers) do
     handlers[method] = function(_, params, _)
