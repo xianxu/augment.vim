@@ -25,7 +25,11 @@ function! s:OpenBuffer() abort
 
     let client = augment#client#Client()
     if has('nvim')
-        call luaeval('require("augment").open_buffer(_A[1], _A[2])', [client.client_id, bufnr('%')])
+        try
+            call luaeval('require("augment").open_buffer(_A[1], _A[2])', [client.client_id, bufnr('%')])
+        catch
+            call luaeval('require("augment_compat").open_buffer(_A[1], _A[2])', [client.client_id, bufnr('%')])
+        endtry
     else
         let uri = 'file://' . expand('%:p')
         let text = s:GetBufText()

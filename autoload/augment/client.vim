@@ -49,13 +49,21 @@ function! s:VimRequest(method, params) dict abort
 endfunction
 
 function! s:NvimNotify(method, params) dict abort
-    call luaeval('require("augment").notify(_A[1], _A[2], _A[3])', [self.client_id, a:method, a:params])
+    try
+        call luaeval('require("augment").notify(_A[1], _A[2], _A[3])', [self.client_id, a:method, a:params])
+    catch
+        call luaeval('require("augment_compat").notify(_A[1], _A[2], _A[3])', [self.client_id, a:method, a:params])
+    endtry
 endfunction
 
 function! s:NvimRequest(method, params) dict abort
     " Passing an empty dictionary results in a malformed table in lua
     let params = empty(a:params) ? [] : a:params
-    call luaeval('require("augment").request(_A[1], _A[2], _A[3])', [self.client_id, a:method, params])
+    try
+        call luaeval('require("augment").request(_A[1], _A[2], _A[3])', [self.client_id, a:method, params])
+    catch
+        call luaeval('require("augment_compat").request(_A[1], _A[2], _A[3])', [self.client_id, a:method, params])
+    endtry
     " For nvim tracking the request methods and params is handled in the lua code
 endfunction
 
@@ -401,8 +409,15 @@ function! s:New() abort
         let notification_methods = keys(notification_handlers)
 
         " If the client exits, lua will notify NvimOnExit()
-        let client.client_id = luaeval('require("augment").start_client(_A[1], _A[2], _A[3])',
+        " Try to use augment_compat module as a fallback if augment module fails
+        try
+            let client.client_id = luaeval('require("augment").start_client(_A[1], _A[2], _A[3])',
                     \ [job_command, notification_methods, workspace_folders])
+        catch
+            echom "Falling back to compatibility module..."
+            let client.client_id = luaeval('require("augment_compat").start_client(_A[1], _A[2], _A[3])',
+                    \ [job_command, notification_methods, workspace_folders])
+        endtry
     else
         " Vim-specific client setup
         call extend(client, {

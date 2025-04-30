@@ -8,6 +8,12 @@ if exists('g:loaded_augment')
 endif
 let g:loaded_augment = 1
 
+" This flag can be set to enable Lua implementation in the future
+" It currently has no effect - we're preparing the groundwork
+if !exists('g:augment_use_lua')
+    let g:augment_use_lua = v:false
+endif
+
 function! s:CheckEditorCompatibility() abort
     " NOTE(mpauly): I'm not aware of any compatibility issues with neovim, but
     " as they come up we can add them here.
@@ -129,6 +135,12 @@ endfunction
 
 " Setup commands
 command! -range -nargs=* -complete=custom,augment#CommandComplete Augment <line1>,<line2> call augment#Command(<range>, <q-args>)
+
+" Debug commands - Lua implementation
+if has('nvim')
+  " View Lua implementation logs
+  command! AugmentShowLuaLog lua require('augment_compat').show_log()
+endif
 
 if !s:CheckEditorCompatibility()
     finish

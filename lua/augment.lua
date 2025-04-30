@@ -1,10 +1,29 @@
 -- Copyright (c) 2025 Augment
 -- MIT License - See LICENSE.md for full terms
 
+-- Debug print to help diagnose loading issues
+vim.schedule(function()
+    vim.api.nvim_echo({{"Augment Lua module loaded", "Normal"}}, false, {})
+end)
+
+-- Make sure our table exists
 local M = {}
 
 -- Start the lsp client
 M.start_client = function(command, notification_methods, workspace_folders)
+    -- Log that we're being called
+    vim.schedule(function()
+        vim.api.nvim_echo({{"Augment start_client called", "Normal"}}, false, {})
+    end)
+    
+    -- Error handling
+    if not command or type(command) ~= "table" then
+        vim.schedule(function()
+            vim.api.nvim_echo({{"Augment error: Invalid command argument", "ErrorMsg"}}, false, {})
+        end)
+        error("Invalid command argument: " .. vim.inspect(command))
+    end
+    
     local vim_version = tostring(vim.version())
     local plugin_version = vim.call('augment#version#Version')
 
