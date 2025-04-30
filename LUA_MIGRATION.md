@@ -12,9 +12,11 @@ We have an incremental, feature-by-feature approach to migrating from VimScript 
 
 3. **Chat Interface**: We've created an enhanced chat interface with better markdown rendering and syntax highlighting for code blocks. This can be enabled with `g:augment_use_lua_chat = v:true`.
 
-4. **Logging System**: We've added a comprehensive logging system in `augment_log.lua` that writes to `~/.local/state/nvim/augment.log`.
+4. **LSP Client**: We've built a pure Lua LSP client that leverages Neovim's native LSP capabilities. This can be enabled with `g:augment_use_lua_lsp = v:true`.
 
-5. **Feature Flags**: Users can selectively enable Lua features via feature flags.
+5. **Logging System**: We've added a comprehensive logging system in `augment_log.lua` that writes to `~/.local/state/nvim/augment.log`.
+
+6. **Feature Flags**: Users can selectively enable Lua features via feature flags.
 
 ## Structure
 
@@ -29,8 +31,8 @@ lua/
     ├── init.lua        # Main entry point and setup
     ├── suggestion.lua  # Suggestion handling with extmarks
     ├── chat.lua        # Enhanced chat interface
+    ├── lsp.lua         # Pure Lua LSP client
     ├── core.lua        # Core functionality (coming soon)
-    ├── client.lua      # LSP client interface (coming soon)
     └── version.lua     # Version tracking (coming soon)
 ```
 
@@ -55,6 +57,9 @@ let g:augment_use_lua_suggestions = v:true
 
 " Enable enhanced chat interface
 let g:augment_use_lua_chat = v:true
+
+" Enable pure Lua LSP client
+let g:augment_use_lua_lsp = v:true
 ```
 
 ### Diagnostic Tools
@@ -77,14 +82,14 @@ We're following an incremental approach:
 2. ✅ Add comprehensive logging
 3. ✅ Implement suggestion handling
 4. ✅ Add chat functionality
-5. ⬜ Implement custom LSP client
+5. ✅ Implement custom LSP client
 6. ⬜ Complete the transition to pure Lua
 
 ## Next Steps
 
-* Implement a custom LSP client in Lua
 * Add more Neovim-specific UI improvements
 * Enhance existing features with Neovim APIs
+* Add diagnostics visualization
 * Complete the transition to pure Lua
 
 Each feature can be independently enabled allowing for gradual adoption and thorough testing.

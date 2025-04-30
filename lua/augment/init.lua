@@ -15,7 +15,7 @@ M.config = {
   features = {
     suggestion = true,  -- Use Lua-based suggestions
     chat = true,        -- Use Lua-based chat
-    lsp = false         -- Use pure Lua LSP client (not implemented yet)
+    lsp = true          -- Use pure Lua LSP client
   },
   
   -- Optional workspace folders
@@ -30,6 +30,13 @@ M.config = {
     position = "right",  -- right, left, top, bottom
     width = 80,
     show_streaming = true
+  },
+  
+  -- LSP client configuration
+  lsp = {
+    autostart = true,    -- Start the LSP client automatically
+    cmd = nil,           -- Use default command
+    root_dir = nil       -- Use current working directory
   }
 }
 
@@ -78,6 +85,48 @@ function M.setup(opts)
       chat.register()
     else
       log.error("Failed to load chat module: " .. tostring(chat))
+    end
+  end
+  
+  if M.config.features.lsp then
+    log.info("Enabling Lua LSP client")
+    -- Lazy-load LSP module
+    local ok, lsp = pcall(require, 'augment/lsp')
+    if ok then
+      -- Configure LSP client
+      if opts and opts.lsp then
+        lsp.configure(opts.lsp)
+      end
+      
+      -- Register handlers
+      if M.config.features.suggestion then
+        local suggestion_ok, suggestion = pcall(require, 'augment/suggestion')
+        if suggestion_ok then
+          lsp.register_notification_handler('augment/suggestion', function(params)
+            suggestion.show(params)
+          end)
+        end
+      end
+      
+      if M.config.features.chat then
+        local chat_ok, chat = pcall(require, 'augment/chat')
+        if chat_ok then
+          lsp.register_notification_handler('augment/chatChunk', function(params)
+            chat.handle_chat_chunk(params)
+          end)
+          
+          lsp.register_response_handler('augment/chat', function(result)
+            chat.handle_chat_response(result)
+          end)
+        end
+      end
+      
+      -- Start the LSP client
+      if M.config.lsp.autostart then
+        lsp.start_client()
+      end
+    else
+      log.error("Failed to load LSP module: " .. tostring(lsp))
     end
   end
   

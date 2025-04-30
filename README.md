@@ -192,14 +192,16 @@ let g:augment_use_lua = v:true
 " Or enable specific features
 let g:augment_use_lua_suggestions = v:true  " Use improved suggestion UI
 let g:augment_use_lua_chat = v:true         " Use enhanced chat interface
+let g:augment_use_lua_lsp = v:true          " Use Neovim-native LSP client
 ```
 
 The Lua implementation provides:
 
 1. **Improved Suggestions**: Uses Neovim's extmarks for cleaner inline suggestions
 2. **Enhanced Chat Interface**: Better markdown rendering, syntax highlighting for code blocks
-3. **Enhanced Logging**: Detailed logs in `~/.local/state/nvim/augment.log`
-4. **Diagnostic Tools**: Use `:AugmentShowLuaLog` to view detailed logs
+3. **Native LSP Integration**: Direct integration with Neovim's LSP infrastructure
+4. **Enhanced Logging**: Detailed logs in `~/.local/state/nvim/augment.log`
+5. **Diagnostic Tools**: Use `:AugmentShowLuaLog` to view detailed logs
 
 These features require Neovim 0.10.0+ and are fully optional - the plugin works
 perfectly with the VimScript implementation as well.

@@ -23,8 +23,13 @@ if !exists('g:augment_use_lua_chat')
     let g:augment_use_lua_chat = v:false
 endif
 
+" Flag to enable pure Lua LSP client
+if !exists('g:augment_use_lua_lsp')
+    let g:augment_use_lua_lsp = v:false
+endif
+
 " Try to use the Lua implementation if enabled
-if has('nvim') && (g:augment_use_lua || g:augment_use_lua_suggestions || g:augment_use_lua_chat)
+if has('nvim') && (g:augment_use_lua || g:augment_use_lua_suggestions || g:augment_use_lua_chat || g:augment_use_lua_lsp)
     " Initialize Lua implementation with appropriate feature flags
     lua << EOF
     -- Try to initialize the Lua implementation
@@ -35,7 +40,7 @@ if has('nvim') && (g:augment_use_lua || g:augment_use_lua_suggestions || g:augme
             features = {
                 suggestion = vim.g.augment_use_lua_suggestions or vim.g.augment_use_lua,
                 chat = vim.g.augment_use_lua_chat or vim.g.augment_use_lua,
-                lsp = false    -- Not implemented yet
+                lsp = vim.g.augment_use_lua_lsp or vim.g.augment_use_lua
             },
             workspace_folders = vim.g.augment_workspace_folders or {},
             disable_tab_mapping = vim.g.augment_disable_tab_mapping or false,
