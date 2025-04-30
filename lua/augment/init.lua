@@ -16,7 +16,8 @@ M.config = {
     suggestion = true,  -- Use Lua-based suggestions
     chat = true,        -- Use Lua-based chat
     lsp = true,         -- Use pure Lua LSP client
-    diagnostics = true  -- Show diagnostics in the editor
+    diagnostics = true, -- Show diagnostics in the editor
+    enhanced_ui = true  -- Use enhanced UI with Neovim-specific features
   },
   
   -- Optional workspace folders
@@ -48,6 +49,31 @@ M.config = {
     underline = true,     -- Underline diagnostics
     update_in_insert = false, -- Don't update in insert mode
     severity_sort = true  -- Sort by severity
+  },
+  
+  -- Enhanced UI configuration
+  ui = {
+    -- Floating windows
+    float = {
+      border = 'rounded',   -- Border style for floating windows
+      max_width = 100,      -- Maximum width for floating windows
+      max_height = 30,      -- Maximum height for floating windows
+      winblend = 10        -- Window transparency (0-100)
+    },
+    
+    -- Markdown rendering
+    markdown = {
+      use_treesitter = true, -- Use treesitter for syntax highlighting
+      syntax_highlight = true, -- Highlight code blocks
+      conceal = true,        -- Use concealing for markdown syntax
+    },
+    
+    -- Notification settings
+    notifications = {
+      enabled = true,        -- Whether to show notifications
+      timeout = 5000,        -- Default timeout for notifications (ms)
+      position = 'top-right' -- Position for notifications
+    }
   }
 }
 
@@ -83,8 +109,13 @@ function M.setup(opts)
   
   if M.config.features.chat then
     log.info("Enabling Lua chat")
+    
+    -- Load regular or enhanced chat module based on UI feature flag
+    local chat_module = M.config.features.enhanced_ui and 'augment/chat_enhanced' or 'augment/chat'
+    log.info("Using chat module: " .. chat_module)
+    
     -- Lazy-load chat module
-    local ok, chat = pcall(require, 'augment/chat')
+    local ok, chat = pcall(require, chat_module)
     if ok then
       -- Configure chat panel
       if opts and opts.chat then
@@ -150,6 +181,33 @@ function M.setup(opts)
           log.info("Diagnostics handlers registered")
         else
           log.error("Failed to load diagnostics module: " .. tostring(diagnostics))
+        end
+      end
+      
+      -- Initialize UI module if enhanced UI is enabled
+      if M.config.features.enhanced_ui then
+        local ui_ok, ui = pcall(require, 'augment/ui')
+        if ui_ok then
+          -- Configure UI
+          if opts and opts.ui then
+            ui.setup(opts.ui)
+          else
+            ui.setup(M.config.ui)
+          end
+          
+          log.info("Enhanced UI initialized")
+          
+          -- Load enhanced hover module
+          local hover_ok, hover = pcall(require, 'augment/hover')
+          if hover_ok then
+            -- Set up hover module
+            hover.setup_keymaps()
+            log.info("Enhanced hover documentation initialized")
+          else
+            log.warn("Failed to load hover module: " .. tostring(hover))
+          end
+        else
+          log.error("Failed to load UI module: " .. tostring(ui))
         end
       end
       

@@ -33,8 +33,13 @@ if !exists('g:augment_use_lua_diagnostics')
     let g:augment_use_lua_diagnostics = v:false
 endif
 
+" Flag to enable enhanced Neovim-specific UI features
+if !exists('g:augment_use_enhanced_ui')
+    let g:augment_use_enhanced_ui = v:false
+endif
+
 " Try to use the Lua implementation if enabled
-if has('nvim') && (g:augment_use_lua || g:augment_use_lua_suggestions || g:augment_use_lua_chat || g:augment_use_lua_lsp || g:augment_use_lua_diagnostics)
+if has('nvim') && (g:augment_use_lua || g:augment_use_lua_suggestions || g:augment_use_lua_chat || g:augment_use_lua_lsp || g:augment_use_lua_diagnostics || g:augment_use_enhanced_ui)
     " Initialize Lua implementation with appropriate feature flags
     lua << EOF
     -- Try to initialize the Lua implementation
@@ -46,7 +51,8 @@ if has('nvim') && (g:augment_use_lua || g:augment_use_lua_suggestions || g:augme
                 suggestion = vim.g.augment_use_lua_suggestions or vim.g.augment_use_lua,
                 chat = vim.g.augment_use_lua_chat or vim.g.augment_use_lua,
                 lsp = vim.g.augment_use_lua_lsp or vim.g.augment_use_lua,
-                diagnostics = vim.g.augment_use_lua_diagnostics or vim.g.augment_use_lua
+                diagnostics = vim.g.augment_use_lua_diagnostics or vim.g.augment_use_lua,
+                enhanced_ui = vim.g.augment_use_enhanced_ui or vim.g.augment_use_lua
             },
             workspace_folders = vim.g.augment_workspace_folders or {},
             disable_tab_mapping = vim.g.augment_disable_tab_mapping or false,
