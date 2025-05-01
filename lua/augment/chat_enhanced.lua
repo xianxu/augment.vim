@@ -821,26 +821,34 @@ end
 
 -- Enhanced message sending with better error handling
 function M.send_message(message, selected_text)
+  -- Save the original buffer and position information BEFORE opening chat panel
+  local original_bufnr = vim.api.nvim_get_current_buf()
+  local original_file = vim.api.nvim_buf_get_name(original_bufnr)
+  local original_uri = vim.uri_from_bufnr(original_bufnr)
+  local original_cursor = vim.api.nvim_win_get_cursor(0)
+  local original_pos = {
+    line = original_cursor[1] - 1,
+    character = original_cursor[2]
+  }
+  
   -- Open chat panel and append message
   M.append_message(message)
   
-  -- Get current URI
-  local uri = M.get_uri()
+  -- Use the saved URI and position from the original buffer (not the chat buffer)
+  local uri = original_uri
   
-  -- Get cursor position
-  local cursor_pos = vim.api.nvim_win_get_cursor(0)
-  local position = {
-    line = cursor_pos[1] - 1,
-    character = cursor_pos[2]
-  }
-  
-  -- Build request parameters
+  -- Build request parameters with the original file location
   local params = {
     textDocumentPosition = {
       textDocument = {
         uri = uri
       },
-      position = position
+      position = original_pos  -- Use the position from original buffer
+    },
+    originalFile = {
+      path = original_file,
+      uri = uri,
+      line = original_cursor[1]
     },
     message = message,
     history = M.get_history()
@@ -849,6 +857,22 @@ function M.send_message(message, selected_text)
   -- Add selected text if provided
   if selected_text then
     params.selectedText = selected_text
+    
+    -- Get visual marks for accurate selection positions
+    local start_pos = vim.fn.getpos("'<")
+    local end_pos = vim.fn.getpos("'>")
+    
+    -- Add detailed selection info
+    params.selectionInfo = {
+      filePath = original_file,
+      startLine = start_pos[2],
+      endLine = end_pos[2],
+      startCol = start_pos[3],
+      endCol = end_pos[3],
+      lineRange = start_pos[2] == end_pos[2] 
+                 and tostring(start_pos[2])
+                 or (start_pos[2] .. "-" .. end_pos[2])
+    }
   end
   
   -- Show progress indicator using the UI module
@@ -865,6 +889,9 @@ function M.send_message(message, selected_text)
       auto_close = true
     })
   end
+  
+  -- Log the parameters for debugging (only to log file, not to user)
+  log.info("Sending chat API parameters: " .. vim.inspect(params))
   
   -- Send the request
   local lsp_ok, lsp = pcall(require, 'augment/lsp')
