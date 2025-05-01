@@ -241,7 +241,7 @@ function M.open_chat_panel()
     win_config = {
       relative = 'editor',
       width = panel_state.width,
-      height = editor_height - 4,
+      height = editor_height - 6,
       col = editor_width - panel_state.width,
       row = 1,
       style = 'minimal',
@@ -251,7 +251,7 @@ function M.open_chat_panel()
     win_config = {
       relative = 'editor',
       width = panel_state.width,
-      height = editor_height - 4,
+      height = editor_height - 6,
       col = 0,
       row = 1,
       style = 'minimal',
