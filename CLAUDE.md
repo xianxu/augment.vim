@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+IMPORTANT: keep code simple, ask clarification questions if a feature is complex. Sometime feature requirement is not clear. If you are not sure, ask for clarification. Favor simpler code.
+
+IMPORTANT: when fixing bugs, try to figure out the root cause based on insights user provides. The next best is to have a likely theory of the cause. If you can't figure out the cause, ask for more information. Do not sprinkle code with excessive guards to bypass the issue.
+
 ## Code Style
 
 - Follow Vim script conventions: `function!` for functions, `s:` prefix for script-local functions

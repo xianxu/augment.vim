@@ -192,6 +192,19 @@ local function ensure_chat_buffer()
   vim.api.nvim_buf_set_keymap(chat_buffer, 'n', '<leader>n', '<cmd>lua require("augment.chat_enhanced").reset()<CR>', 
     { noremap = true, silent = true, desc = "Start new conversation" })
   
+  -- Add mapping for navigating to file locations
+  vim.api.nvim_buf_set_keymap(chat_buffer, 'n', 'gf', '<cmd>lua require("augment.chat_enhanced").goto_file_under_cursor()<CR>', 
+    { noremap = true, silent = true, desc = "Go to file:line under cursor" })
+  
+  -- Alternative mapping with Ctrl+]
+  vim.api.nvim_buf_set_keymap(chat_buffer, 'n', '<C-]>', '<cmd>lua require("augment.chat_enhanced").goto_file_under_cursor()<CR>', 
+    { noremap = true, silent = true, desc = "Go to file:line under cursor" })
+    
+  -- Add mouse click support for file references
+  vim.api.nvim_buf_set_keymap(chat_buffer, 'n', '<2-LeftMouse>', '<cmd>lua require("augment.chat_enhanced").goto_file_under_cursor()<CR>', 
+    { noremap = true, silent = true, desc = "Go to file:line under cursor with mouse" })
+    
+  
   -- Add welcome message
   local welcome_lines = {
     "# Augment Chat",
@@ -200,6 +213,8 @@ local function ensure_chat_buffer()
     "- Press <Enter> to send a new message",
     "- Press <leader>n to start a new conversation",
     "- Press q to close the chat panel",
+    "- Use gf or <C-]> on file:line references to navigate to code",
+    "- Double-click on file:line references to navigate to code",
     ""
   }
   
@@ -365,12 +380,14 @@ local function set_loading(state)
     end)
     
     if state then
-      -- Add loading indicator at the end
+      -- Add loading indicator at the end with file:line first
+      local file_line = "@" .. vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":~:.") .. ":" .. vim.fn.line('.')
       local loading_text = config.visual.icons.loading .. " Augment is thinking..."
       vim.api.nvim_buf_set_lines(chat_buffer, line_count, line_count, false, 
-        {"", loading_text, ""})
+        {"", file_line, loading_text, ""})
       pcall(function()
-        vim.api.nvim_buf_add_highlight(chat_buffer, -1, "AugmentChatLoading", line_count + 1, 0, -1)
+        vim.api.nvim_buf_add_highlight(chat_buffer, -1, "Comment", line_count + 1, 0, -1)
+        vim.api.nvim_buf_add_highlight(chat_buffer, -1, "AugmentChatLoading", line_count + 2, 0, -1)
       end)
       
       -- Start a loading animation
@@ -401,10 +418,11 @@ local function set_loading(state)
       end
     else
       -- Remove loading indicator if it exists
-      if line_count > 1 then
-        local last_line = vim.api.nvim_buf_get_lines(chat_buffer, line_count - 1, line_count, false)[1]
-        if last_line:match("Augment is thinking") then
-          vim.api.nvim_buf_set_lines(chat_buffer, line_count - 2, line_count, false, {})
+      if line_count > 2 then
+        local line = vim.api.nvim_buf_get_lines(chat_buffer, line_count - 1, line_count, false)[1]
+        if line:match("Augment is thinking") then
+          -- Remove the thinking line, the file:line before it, and the blank line before that
+          vim.api.nvim_buf_set_lines(chat_buffer, line_count - 3, line_count, false, {})
         end
       end
       
@@ -424,18 +442,31 @@ local function set_loading(state)
 end
 
 -- Append user message to chat with enhanced formatting
-function M.append_message(message)
+function M.append_message(message, file_info)
   ensure_chat_buffer()
   M.open_chat_panel()
   
   -- Get line count
   local line_count = vim.api.nvim_buf_line_count(chat_buffer)
   
+  -- Add user message
+  vim.api.nvim_buf_set_option(chat_buffer, 'modifiable', true)
+  
+  -- Add file location as a navigable link (if provided explicitly)
+  if file_info and file_info ~= "" then
+    vim.api.nvim_buf_set_lines(chat_buffer, line_count, line_count, false, {
+      config.visual.icons.user .. "@" .. file_info,
+      ""
+    })
+    -- Highlight the location line
+    vim.api.nvim_buf_add_highlight(chat_buffer, -1, "SpecialComment", line_count, 0, -1)
+    line_count = line_count + 2
+  end
+  
   -- Format user message with icon
   local formatted_message = config.visual.icons.user .. "**You:** " .. message
   
-  -- Add user message
-  vim.api.nvim_buf_set_option(chat_buffer, 'modifiable', true)
+  -- Add the actual message
   vim.api.nvim_buf_set_lines(chat_buffer, line_count, line_count, false, {
     formatted_message,
     ""
@@ -652,10 +683,11 @@ local function start_streaming()
     
     -- Remove loading indicator if present
     if is_loading then
-      local last_line = vim.api.nvim_buf_get_lines(chat_buffer, line_count - 1, line_count, false)[1]
-      if last_line and last_line:match("Augment is thinking") then
-        vim.api.nvim_buf_set_lines(chat_buffer, line_count - 2, line_count, false, {})
-        line_count = line_count - 2
+      local line = vim.api.nvim_buf_get_lines(chat_buffer, line_count - 1, line_count, false)[1]
+      if line and line:match("Augment is thinking") then
+        -- Remove the thinking line, the file:line before it, and the blank line before that
+        vim.api.nvim_buf_set_lines(chat_buffer, line_count - 3, line_count, false, {})
+        line_count = line_count - 3
       end
     end
     
@@ -801,6 +833,8 @@ function M.reset()
         "- Press <Enter> to send a new message",
         "- Press <leader>n to start a new conversation",
         "- Press q to close the chat panel",
+        "- Use gf or <C-]> on file:line references to navigate to code",
+        "- Double-click on file:line references to navigate to code",
         ""
       })
       pcall(function()
@@ -831,13 +865,55 @@ function M.send_message(message, selected_text)
     character = original_cursor[2]
   }
   
-  -- Open chat panel and append message
+  -- Start by opening the chat panel and adding the user's message
+  -- without the location info which we'll add after we build the request
   M.append_message(message)
   
   -- Use the saved URI and position from the original buffer (not the chat buffer)
   local uri = original_uri
   
   -- Build request parameters with the original file location
+  -- Try different methods to get the correct line number
+  local line_number = original_cursor[1]  -- Start with cursor position (should be 1-based)
+  
+  -- Log the cursor position for debugging
+  log.info("Original cursor position: line=" .. tostring(original_cursor[1]) .. ", col=" .. tostring(original_cursor[2]))
+  
+  -- Method 1: Get from position in LSP format (from getpos())
+  if line_number <= 0 and vim.fn.exists("*getpos") == 1 then
+    local pos = vim.fn.getpos('.')
+    if pos and #pos >= 2 and pos[2] > 0 then
+      line_number = pos[2]
+      log.info("Line number from getpos(): " .. tostring(line_number))
+    end
+  end
+  
+  -- Method 2: Get from visual selection if available
+  if line_number <= 0 and selected_text then
+    local start_pos = vim.fn.getpos("'<")
+    if start_pos and start_pos[2] > 0 then
+      line_number = start_pos[2]
+      log.info("Line number from visual selection: " .. tostring(line_number))
+    end
+  end
+  
+  -- Method 3: Try to get from buffer directly
+  if line_number <= 0 then
+    local success, curline = pcall(function()
+      return vim.fn.line('.')
+    end)
+    if success and curline > 0 then
+      line_number = curline
+      log.info("Line number from line('.'): " .. tostring(line_number))
+    end
+  end
+  
+  -- Method 4: Last resort, use line 1 
+  if line_number <= 0 then
+    line_number = 1
+    log.info("Using default line number: 1")
+  end
+  
   local params = {
     textDocumentPosition = {
       textDocument = {
@@ -848,11 +924,13 @@ function M.send_message(message, selected_text)
     originalFile = {
       path = original_file,
       uri = uri,
-      line = original_cursor[1]
+      line = line_number
     },
     message = message,
     history = M.get_history()
   }
+  
+  -- No need to update location display anymore as we'll create it from scratch below
   
   -- Add selected text if provided
   if selected_text then
@@ -873,6 +951,36 @@ function M.send_message(message, selected_text)
                  and tostring(start_pos[2])
                  or (start_pos[2] .. "-" .. end_pos[2])
     }
+  end
+  
+  -- Now that we have built the originalFile info, add it to the chat as context
+  -- This ensures we're using the line number that will be sent to the server
+  if ensure_chat_buffer() and vim.api.nvim_buf_is_valid(chat_buffer) then
+    pcall(function()
+      -- Get the file path in a more readable format
+      local file_path = vim.fn.fnamemodify(params.originalFile.path, ':~:.')
+      local line_number = params.originalFile.line
+      local location_info = file_path .. ":" .. line_number
+      
+      -- Get current line count
+      local line_count = vim.api.nvim_buf_line_count(chat_buffer)
+      
+      -- Find the last empty line (which should be after the user's message)
+      local last_line
+      for i = line_count, 1, -1 do
+        last_line = vim.api.nvim_buf_get_lines(chat_buffer, i-1, i, false)[1]
+        if last_line == "" then
+          -- Insert the context line before this empty line
+          vim.api.nvim_buf_set_option(chat_buffer, 'modifiable', true)
+          vim.api.nvim_buf_set_lines(chat_buffer, i-1, i-1, false, {config.visual.icons.user .. "@" .. location_info})
+          vim.api.nvim_buf_add_highlight(chat_buffer, -1, "SpecialComment", i-1, 0, -1)
+          vim.api.nvim_buf_set_option(chat_buffer, 'modifiable', false)
+          break
+        end
+      end
+      
+      log.info("Added file context to chat: " .. location_info)
+    end)
   end
   
   -- Show progress indicator using the UI module
@@ -969,6 +1077,11 @@ function M.handle_chat_response(params)
     
     -- Make sure params exists and has the expected fields
     if params and params.text then
+      -- Log the original file info if available
+      if params.originalFile then
+        log.info("Original file: " .. vim.inspect(params.originalFile))
+      end
+      
       -- If we were streaming, finish that first
       if streaming_active then
         finish_streaming()
@@ -1069,6 +1182,122 @@ function M.register()
   end
   
   return true
+end
+
+-- Navigate to file:line under cursor with enhanced UI feedback
+function M.goto_file_under_cursor()
+  -- Get current line under cursor
+  local line_nr = vim.api.nvim_win_get_cursor(0)[1]
+  local line = vim.api.nvim_buf_get_lines(0, line_nr - 1, line_nr, false)[1]
+  
+  -- Check if line contains a file reference pattern
+  local file_pattern = "@(.+):(%d+)%-?(%d*)" -- Matches @file:line or @file:line-line
+  local file_path, start_line, end_line = line:match(file_pattern)
+  
+  -- If not in a file reference line, try to find file:line pattern anywhere in the line
+  if not file_path then
+    file_pattern = "([%w%._%-/\\~]+):(%d+)%-?(%d*)" -- Matches file:line or file:line-line
+    file_path, start_line, end_line = line:match(file_pattern)
+  end
+  
+  if file_path and start_line then
+    -- Expand the file path if needed
+    if file_path:sub(1, 1) == "~" then
+      file_path = vim.fn.expand(file_path)
+    elseif file_path:sub(1, 1) ~= "/" then
+      -- Relative path - try to resolve based on current working directory
+      file_path = vim.fn.fnamemodify(file_path, ":p")
+    end
+    
+    -- Convert line to number
+    start_line = tonumber(start_line)
+    
+    -- Close chat panel to focus on main window
+    if chat_window and vim.api.nvim_win_is_valid(chat_window) then
+      local temp_win = chat_window
+      chat_window = nil
+      panel_state.visible = false
+      vim.api.nvim_win_close(temp_win, true)
+    end
+    
+    -- Check if the file exists
+    if vim.fn.filereadable(file_path) == 1 then
+      -- Display a short notification
+      ui.notify("Navigating to " .. vim.fn.fnamemodify(file_path, ":t") .. ":" .. start_line, "info", {
+        timeout = 1000,
+        icon = config.visual.icons.success
+      })
+      
+      -- Try to find an existing buffer or window already showing the file
+      local buffer_found = false
+      for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_is_loaded(buf) then
+          local buf_name = vim.api.nvim_buf_get_name(buf)
+          if buf_name == file_path then
+            -- Found a buffer with this file
+            for _, win in ipairs(vim.api.nvim_list_wins()) do
+              if vim.api.nvim_win_get_buf(win) == buf then
+                -- The file is visible in a window, focus it
+                vim.api.nvim_set_current_win(win)
+                vim.api.nvim_win_set_cursor(win, {start_line, 0})
+                buffer_found = true
+                break
+              end
+            end
+            
+            if not buffer_found then
+              -- Buffer exists but isn't in a window, switch to it
+              vim.cmd('buffer ' .. buf)
+              vim.api.nvim_win_set_cursor(0, {start_line, 0})
+              buffer_found = true
+            end
+            
+            break
+          end
+        end
+      end
+      
+      if not buffer_found then
+        -- File not in any buffer, open it
+        vim.cmd('edit ' .. vim.fn.fnameescape(file_path))
+        vim.api.nvim_win_set_cursor(0, {start_line, 0})
+      end
+      
+      -- Center the cursor on screen
+      vim.cmd('normal! zz')
+      
+      -- Flash the line briefly for visibility
+      vim.api.nvim_buf_clear_namespace(0, -1, 0, -1)
+      local ns_id = vim.api.nvim_create_namespace('AugmentNavigation')
+      vim.api.nvim_buf_add_highlight(0, ns_id, "Search", start_line - 1, 0, -1)
+      
+      -- Schedule removal of highlight
+      vim.defer_fn(function()
+        if vim.api.nvim_buf_is_valid(0) then
+          vim.api.nvim_buf_clear_namespace(0, ns_id, 0, -1)
+        end
+      end, 1500) -- Clear after 1.5 seconds
+      
+      log.info("Navigated to " .. file_path .. ":" .. start_line)
+      return true
+    else
+      -- File doesn't exist
+      log.warn("File not found: " .. file_path)
+      ui.notify("File not found: " .. file_path, "error", {
+        timeout = 3000,
+        icon = config.visual.icons.error
+      })
+      return false
+    end
+  else
+    -- No file reference found
+    log.warn("No file reference found under cursor")
+    ui.notify("No file reference found under cursor", "warn", {
+      timeout = 2000,
+      icon = config.visual.icons.error
+    })
+    return false
+  end
 end
 
 -- Initialize with default config
