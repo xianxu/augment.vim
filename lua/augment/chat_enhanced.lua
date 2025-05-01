@@ -380,14 +380,12 @@ local function set_loading(state)
     end)
     
     if state then
-      -- Add loading indicator at the end with file:line first
-      local file_line = "@" .. vim.fn.fnamemodify(vim.api.nvim_buf_get_name(0), ":~:.") .. ":" .. vim.fn.line('.')
+      -- Add loading indicator at the end with just the thinking message
       local loading_text = config.visual.icons.loading .. " Augment is thinking..."
       vim.api.nvim_buf_set_lines(chat_buffer, line_count, line_count, false, 
-        {"", file_line, loading_text, ""})
+        {"", loading_text, ""})
       pcall(function()
-        vim.api.nvim_buf_add_highlight(chat_buffer, -1, "Comment", line_count + 1, 0, -1)
-        vim.api.nvim_buf_add_highlight(chat_buffer, -1, "AugmentChatLoading", line_count + 2, 0, -1)
+        vim.api.nvim_buf_add_highlight(chat_buffer, -1, "AugmentChatLoading", line_count + 1, 0, -1)
       end)
       
       -- Start a loading animation
@@ -418,11 +416,11 @@ local function set_loading(state)
       end
     else
       -- Remove loading indicator if it exists
-      if line_count > 2 then
+      if line_count > 1 then
         local line = vim.api.nvim_buf_get_lines(chat_buffer, line_count - 1, line_count, false)[1]
         if line:match("Augment is thinking") then
-          -- Remove the thinking line, the file:line before it, and the blank line before that
-          vim.api.nvim_buf_set_lines(chat_buffer, line_count - 3, line_count, false, {})
+          -- Remove the thinking line and the blank line before it
+          vim.api.nvim_buf_set_lines(chat_buffer, line_count - 2, line_count, false, {})
         end
       end
       
@@ -685,9 +683,9 @@ local function start_streaming()
     if is_loading then
       local line = vim.api.nvim_buf_get_lines(chat_buffer, line_count - 1, line_count, false)[1]
       if line and line:match("Augment is thinking") then
-        -- Remove the thinking line, the file:line before it, and the blank line before that
-        vim.api.nvim_buf_set_lines(chat_buffer, line_count - 3, line_count, false, {})
-        line_count = line_count - 3
+        -- Remove the thinking line and the blank line before it
+        vim.api.nvim_buf_set_lines(chat_buffer, line_count - 2, line_count, false, {})
+        line_count = line_count - 2
       end
     end
     
@@ -875,6 +873,9 @@ function M.send_message(message, selected_text)
   -- Build request parameters with the original file location
   -- Try different methods to get the correct line number
   local line_number = original_cursor[1]  -- Start with cursor position (should be 1-based)
+  
+  -- Store line number for later use with thinking indicator
+  vim.b.last_line = line_number
   
   -- Log the cursor position for debugging
   log.info("Original cursor position: line=" .. tostring(original_cursor[1]) .. ", col=" .. tostring(original_cursor[2]))
